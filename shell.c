@@ -3,10 +3,31 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <sys/resource.h>//esto es necesario para usar RUSAGE
 
 #define MAX_INPUT 1024
 #define MAX_ARG 64
 
+//variables para el resumen
+int total_procesos = 0;
+
+// Función para imprimir el resumen antes de salir
+void mostrar_resumen() {
+    struct rusage usage;
+
+    printf("\nResumen de Sesion de la Shell\n");
+    printf("Procesos ejecutados (programas externos): %d\n", total_procesos);
+
+    // Obtener uso de memoria de la shell y sus hijos
+    //getrusage nos ayuda a obtener los datos de los procesos
+    if (getrusage(RUSAGE_CHILDREN, &usage) == 0) {
+        printf("Memoria maxima residente de procesos hijos: %ld KB\n", usage.ru_maxrss);//aca entrega los datos de los procesos hijos(CHILDREN) con el tamaño maximo
+    }
+    if (getrusage(RUSAGE_SELF, &usage) == 0) {//RUSAGE_SELF obtiene lo mismo que el RUSAGE_CHILDREN pero para los hilos(la suma de estos)
+        printf("Memoria maxima residente del proceso Shell: %ld KB\n", usage.ru_maxrss);
+    }
+}
+//funcion para los commando incorporados
 int BuiltIn(char **args){
 
     if (args[0] == NULL) {
@@ -16,6 +37,7 @@ int BuiltIn(char **args){
     //comando para salir
     if(strcmp(args[0], "exit") == 0){
             printf("Exiting shell...\n");
+            mostrar_resumen();
             exit(0);
         }
 
@@ -39,6 +61,7 @@ int BuiltIn(char **args){
         printf("Soportados: ls | grep txt\n");
         return 1;
     }
+    return 0;
 
 }
 
@@ -71,6 +94,11 @@ int main(int argc, char *argv[]){
         }
 
         if(args[0] == NULL){
+            continue;
+        }
+
+        //comprobacion de comando incorporado
+        if (BuiltIn(args)) {
             continue;
         }
 
