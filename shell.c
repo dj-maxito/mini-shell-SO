@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
-#include <sys/resource.h>
+#include <sys/resource.h>//esto es necesario para usar RUSAGE
 
 #define MAX_INPUT 1024
 #define MAX_ARG 64
@@ -28,6 +28,7 @@ void mostrar_resumen() {
     }
 }
 
+//funcion para los commando incorporados
 int BuiltIn(char **args){
 
     if (args[0] == NULL) {
@@ -36,8 +37,8 @@ int BuiltIn(char **args){
 
     //comando para salir
     if(strcmp(args[0], "exit") == 0){
-        mostrar_resumen();
         printf("Exiting shell...\n");
+        mostrar_resumen();
         exit(0);
     }
 
@@ -84,8 +85,12 @@ int main(int argc, char *argv[]){
         //Prompt
         printf("minish > ");
 
-        //Agarra inputs del teclado
-        fgets(buf, MAX_INPUT, stdin);
+        //Agarra inputs del teclado e impide que se rompa si uno hace ctrl+D
+        if (fgets(buf, MAX_INPUT, stdin) == NULL) {
+            printf("\nExiting shell...\n");
+            mostrar_resumen();
+            break; // Rompe el bucle y permite que main retorne 0 de forma limpia
+        }
 
         //Quitamos la linea extra q se crea con \n
         char *nl = strchr(buf, '\n');
@@ -117,6 +122,7 @@ int main(int argc, char *argv[]){
         pid_t pid = fork();
 
         if(pid > 0){
+            //el proceso padre incrementa el contador y espera
             total_procesos++;
             //Es el proceso padre
             wait(NULL);
