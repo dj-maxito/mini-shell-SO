@@ -74,6 +74,28 @@ void recolectar_hijos(){
     }
 }
 
+//esperar los procesos hijos antes de ejecutar exit
+void esperar_hijos(){
+    pid_t pid;
+
+    while(1){
+        pid = waitpid(-1, NULL, 0);
+
+        if(pid > 0){
+            printf("Proceso %d finalizado\n", pid);
+            mostrar_memoria();
+        }else{
+            if(errno == EINTR){
+                continue;
+            }
+            if(errno != ECHILD){
+                perror("waitpid");
+            }
+            break;
+        }
+    }
+}
+
 //funcion para los commando incorporados
 int BuiltIn(char **args){
 
@@ -81,9 +103,10 @@ int BuiltIn(char **args){
         return 1; // comando vacio
     }
 
-    //comando para salir
+    //comando para cerrar minishell
     if(strcmp(args[0], "exit") == 0){
-        printf("Exiting shell...\n");
+        printf("Saliendo...\n");
+        esperar_hijos();
         mostrar_resumen();
         exit(0);
     }
@@ -112,11 +135,14 @@ int BuiltIn(char **args){
     }
 
     //comando help
-    if (strcmp(args[0], "help") == 0) {
+    if(strcmp(args[0], "help") == 0){
         printf("\nSimple Shell Help\n");
-        printf("comando propios:\n");
-        printf("  cd <dir>\n  exit\n  help\n");
-        printf("Soportados: ls | grep txt\n");
+        printf("Comandos propios:\n");
+        printf("  cd [dir]: Cambia el directorio actual\n");
+        printf("  help: Muestra esta ayuda\n");
+        printf("  exit: Cierra la shell y muestra el resumen\n");
+        printf("Programas externos: ls, pwd, echo, sleep, etc.\n");
+        printf("Segundo plano: agregar & al final del comando\n");
         return 1;
     }
     return 0;
@@ -150,7 +176,8 @@ int main(void){
                 continue;
             }
 
-            printf("\nExiting shell...\n");
+            printf("\nSaliendo...\n");
+            esperar_hijos();
             mostrar_resumen();
             break;
         }
