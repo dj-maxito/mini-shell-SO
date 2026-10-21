@@ -1,5 +1,11 @@
 # Mini-Shell en C
 
+## Integrantes:
+
+- Angelo Reyes
+- Benjamin Uribe
+- Max Coñoman
+
 ## 1. Descripcion
 
 Mini-Shell es un programa desarrollado en C que simula el funcionamiento básico de una terminal de Linux. Su objetivo es recibir comandos del usuario, ejecutar programas externos y administrar los procesos que se generan, tanto en primer como en segundo plano.
