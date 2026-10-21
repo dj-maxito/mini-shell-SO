@@ -28,6 +28,33 @@ void mostrar_resumen() {
     }
 }
 
+//funcion para mostrar memoria
+void mostrar_memoria(){
+    FILE *archivo = fopen("/proc/meminfo", "r");
+    char linea[128];
+    long memoria = -1;
+
+    if(archivo == NULL){
+        perror("No se pudo abrir /proc/meminfo");
+        return;
+    }
+
+    //buscar memoria
+    while(fgets(linea, sizeof(linea), archivo) != NULL){
+        if(sscanf(linea, "MemAvailable: %ld kB", &memoria) == 1){
+            break;
+        }
+    }
+
+    fclose(archivo);
+
+    if(memoria != -1){
+        printf("Memoria disponible: %ld kB\n", memoria);
+    }else{
+        printf("No se pudo obtener la memoria\n");
+    }
+}
+
 //funcion para los commando incorporados
 int BuiltIn(char **args){
 
@@ -44,7 +71,7 @@ int BuiltIn(char **args){
 
     //cambio de directorio
     if(strcmp(args[0], "cd") == 0){
-        if(args[2] != NULL){
+        if(args[1] != NULL && args[2] != NULL){
             printf("Muchos argumentos\n");
             return 1;
         }
@@ -77,7 +104,7 @@ int BuiltIn(char **args){
 
 }
 
-int main(int argc, char *argv[]){
+int main(void){
     while(1){
         //String que almacenará los input del teclado
         char buf[MAX_INPUT];
@@ -100,16 +127,16 @@ int main(int argc, char *argv[]){
         }
 
         //Dividimos buf en diferentes argumentos
-        char *args[MAX_ARG]; //Punteros de los comandos
+        char *args[MAX_ARG] = {NULL};
         int nargs = 0;
 
         args[nargs] = strtok(buf, " ");
-        while (args[nargs] != NULL)
-        {
+        while(args[nargs] != NULL && nargs < MAX_ARG - 1){
             args[++nargs] = strtok(NULL, " ");
         }
 
-        if(args[0] == NULL){
+        if(args[nargs] != NULL){
+            printf("Demasiados argumentos\n");
             continue;
         }
 
@@ -125,15 +152,21 @@ int main(int argc, char *argv[]){
             //el proceso padre incrementa el contador y espera
             total_procesos++;
             //Es el proceso padre
-            wait(NULL);
-        }else{
+            if(waitpid(pid, NULL, 0) != -1){
+                mostrar_memoria();
+            }else{
+                perror("waitpid");
+            }
+        }else if(pid == 0){
             //Es el proceso hijo
             if(execvp(args[0], args) < 0){
-
-            //Si exec da error
-            fprintf(stderr, "exec no pudo ejecutar %s\n", buf);
+                //Si exec da error
+                fprintf(stderr, "exec no pudo ejecutar %s\n", args[0]);
             }
             exit(1);
+        }else{
+            //Si fork da error
+            perror("fork");
         }
     }
 }
