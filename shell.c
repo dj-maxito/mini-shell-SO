@@ -27,6 +27,7 @@ void mostrar_resumen() {
         printf("Memoria maxima residente del proceso Shell: %ld KB\n", usage.ru_maxrss);
     }
 }
+
 //funcion para los commando incorporados
 int BuiltIn(char **args){
 
@@ -36,18 +37,29 @@ int BuiltIn(char **args){
 
     //comando para salir
     if(strcmp(args[0], "exit") == 0){
-            printf("Exiting shell...\n");
-            mostrar_resumen();
-            exit(0);
-        }
+        printf("Exiting shell...\n");
+        mostrar_resumen();
+        exit(0);
+    }
 
     //cambio de directorio
     if(strcmp(args[0], "cd") == 0){
-        if(args[1] == NULL){
-            printf("Expected argument after cd\n");
+        if(args[2] != NULL){
+            printf("Muchos argumentos\n");
+            return 1;
+        }
+
+        char *dir = args[1];
+
+        if(dir == NULL){
+            dir = getenv("HOME");
+        }
+
+        if(dir == NULL){
+            printf("No se encontro HOME\n");
         }else{
-            if(chdir(args[1]) != 0){
-                printf("cd failed\n");
+            if(chdir(dir) != 0){
+                perror("cd");
             }
         }
         return 1;
