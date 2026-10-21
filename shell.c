@@ -4,16 +4,54 @@
 #include <sys/wait.h>
 #include <string.h>
 
+#define MAX_INPUT 1024
+#define MAX_ARG 64
+
+int BuiltIn(char **args){
+
+    if (args[0] == NULL) {
+        return 1; // comando vacio
+    }
+
+    //comando para salir
+    if(strcmp(args[0], "exit") == 0){
+            printf("Exiting shell...\n");
+            exit(0);
+        }
+
+    //cambio de directorio
+    if(strcmp(args[0], "cd") == 0){
+        if(args[1] == NULL){
+            printf("Expected argument after cd\n");
+        }else{
+            if(chdir(args[1]) != 0){
+                printf("cd failed\n");
+            }
+        }
+        return 1;
+    }
+
+    //comando help
+    if (strcmp(args[0], "help") == 0) {
+        printf("\nSimple Shell Help\n");
+        printf("comando propios:\n");
+        printf("  cd <dir>\n  exit\n  help\n");
+        printf("Soportados: ls | grep txt\n");
+        return 1;
+    }
+
+}
+
 int main(int argc, char *argv[]){
     while(1){
         //String que almacenará los input del teclado
-        char buf[1024];
+        char buf[MAX_INPUT];
 
         //Prompt
         printf("minish > ");
 
         //Agarra inputs del teclado
-        fgets(buf, 1024, stdin);
+        fgets(buf, MAX_INPUT, stdin);
 
         //Quitamos la linea extra q se crea con \n
         char *nl = strchr(buf, '\n');
@@ -23,7 +61,7 @@ int main(int argc, char *argv[]){
         }
 
         //Dividimos buf en diferentes argumentos
-        char *args[20];
+        char *args[MAX_ARG]; //Punteros de los comandos
         int nargs = 0;
 
         args[nargs] = strtok(buf, " ");
@@ -36,10 +74,6 @@ int main(int argc, char *argv[]){
             continue;
         }
 
-        if(strcmp(args[0], "exit") == 0){
-            exit(0);
-        }
-
         //Fork & exec
         pid_t pid = fork();
 
@@ -48,10 +82,12 @@ int main(int argc, char *argv[]){
             wait(NULL);
         }else{
             //Es el proceso hijo
-            execvp(args[0], args);
+            if(execvp(args[0], args) < 0){
 
             //Si exec da error
             fprintf(stderr, "exec no pudo ejecutar %s\n", buf);
+            }
+            exit(1);
         }
     }
 }
