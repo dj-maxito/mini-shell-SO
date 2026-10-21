@@ -1,12 +1,16 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
 #include <sys/resource.h>//esto es necesario para usar RUSAGE
+#include <signal.h>
+#include <errno.h>
 
 #define MAX_INPUT 1024
 #define MAX_ARG 64
+
 
 //variables para el resumen
 int total_procesos = 0;
@@ -21,10 +25,10 @@ void mostrar_resumen() {
     // Obtener uso de memoria de la shell y sus hijos
     //getrusage nos ayuda a obtener los datos de los procesos
     if (getrusage(RUSAGE_CHILDREN, &usage) == 0) {
-        printf("Memoria maxima residente de procesos hijos: %ld KB\n", usage.ru_maxrss);//aca entrega los datos de los procesos hijos(CHILDREN) con el tamaño maximo
+        printf("Memoria maxima de procesos hijos: %ld KB\n", usage.ru_maxrss);//aca entrega los datos de los procesos hijos(CHILDREN) con el tamaño maximo
     }
     if (getrusage(RUSAGE_SELF, &usage) == 0) {//RUSAGE_SELF obtiene lo mismo que el RUSAGE_CHILDREN pero para los hilos(la suma de estos)
-        printf("Memoria maxima residente del proceso Shell: %ld KB\n", usage.ru_maxrss);
+        printf("Memoria maxima del proceso Shell: %ld KB\n", usage.ru_maxrss);
     }
 }
 
@@ -52,6 +56,21 @@ void mostrar_memoria(){
         printf("Memoria disponible: %ld kB\n", memoria);
     }else{
         printf("No se pudo obtener la memoria\n");
+    }
+}
+
+//avisa cuando termina un proceso hijo
+void avisar_fin(int senal){
+    (void)senal;
+}
+
+//recoger procesos hijos que ya terminaron
+void recolectar_hijos(){
+    pid_t pid;
+
+    while((pid = waitpid(-1, NULL, WNOHANG)) > 0){
+        printf("\nProceso %d finalizado\n", pid);
+        mostrar_memoria();
     }
 }
 
@@ -105,18 +124,35 @@ int BuiltIn(char **args){
 }
 
 int main(void){
+    struct sigaction accion = {0};
+    accion.sa_handler = avisar_fin;
+    sigemptyset(&accion.sa_mask);
+    accion.sa_flags = 0;
+
+    if(sigaction(SIGCHLD, &accion, NULL) == -1){
+        perror("sigaction");
+        return 1;
+    }
+
     while(1){
+        recolectar_hijos();
         //String que almacenará los input del teclado
         char buf[MAX_INPUT];
 
         //Prompt
         printf("minish > ");
+        fflush(stdout);
 
         //Agarra inputs del teclado e impide que se rompa si uno hace ctrl+D
-        if (fgets(buf, MAX_INPUT, stdin) == NULL) {
+        if(fgets(buf, MAX_INPUT, stdin) == NULL){
+            if(ferror(stdin) && errno == EINTR){
+                clearerr(stdin);
+                continue;
+            }
+
             printf("\nExiting shell...\n");
             mostrar_resumen();
-            break; // Rompe el bucle y permite que main retorne 0 de forma limpia
+            break;
         }
 
         //Quitamos la linea extra q se crea con \n
@@ -145,17 +181,53 @@ int main(void){
             continue;
         }
 
+        //verificar si el comando termina en &
+        int segundo_plano = 0;
+
+        if(nargs > 0 && strcmp(args[nargs - 1], "&") == 0){
+            if(nargs == 1){
+                printf("Falta un comando antes de &\n");
+                continue;
+            }
+
+            segundo_plano = 1;
+            args[nargs - 1] = NULL;
+        }
+
         //Fork & exec
         pid_t pid = fork();
-
-        if(pid > 0){
-            //el proceso padre incrementa el contador y espera
+        
+	if(pid > 0){
+            //el proceso padre incrementa el contador
             total_procesos++;
-            //Es el proceso padre
-            if(waitpid(pid, NULL, 0) != -1){
-                mostrar_memoria();
+
+            if(segundo_plano){
+                printf("Proceso en segundo plano: %d\n", pid);
             }else{
-                perror("waitpid");
+                //esperar hasta que termine el proceso en primer plano
+                pid_t terminado;
+
+                while(1){
+                    terminado = waitpid(-1, NULL, 0);
+
+                    if(terminado == -1){
+                        if(errno == EINTR){
+                            continue;
+                        }
+                        perror("waitpid");
+                        break;
+                    }
+
+                    if(terminado != pid){
+                        printf("Proceso %d finalizado\n", terminado);
+                    }
+
+                    mostrar_memoria();
+
+                    if(terminado == pid){
+                        break;
+                    }
+                }
             }
         }else if(pid == 0){
             //Es el proceso hijo
@@ -163,7 +235,7 @@ int main(void){
                 //Si exec da error
                 fprintf(stderr, "exec no pudo ejecutar %s\n", args[0]);
             }
-            exit(1);
+                exit(1);
         }else{
             //Si fork da error
             perror("fork");
