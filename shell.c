@@ -73,8 +73,12 @@ int main(int argc, char *argv[]){
         //Prompt
         printf("minish > ");
 
-        //Agarra inputs del teclado
-        fgets(buf, MAX_INPUT, stdin);
+        //Agarra inputs del teclado e impide que se rompa si uno hace ctrl+D
+        if (fgets(buf, MAX_INPUT, stdin) == NULL) {
+            printf("\nExiting shell...\n");
+            mostrar_resumen();
+            break; // Rompe el bucle y permite que main retorne 0 de forma limpia
+        }
 
         //Quitamos la linea extra q se crea con \n
         char *nl = strchr(buf, '\n');
@@ -106,6 +110,8 @@ int main(int argc, char *argv[]){
         pid_t pid = fork();
 
         if(pid > 0){
+            //el proceso padre incrementa el contador y espera
+            total_procesos++;
             //Es el proceso padre
             wait(NULL);
         }else{
